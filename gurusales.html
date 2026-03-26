@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GuruSales — Flight Ticket Accounting</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#080c14;--surface:#0e1420;--card:#131b2a;--border:#1e2d45;
+  --accent:#0ea5e9;--accent2:#38bdf8;--green:#22c55e;--red:#ef4444;
+  --amber:#f59e0b;--text:#e2eaf5;--muted:#7a8fa8;
+  --font:'DM Sans',sans-serif;--heading:'Syne',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+
+/* AUTH */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 30% 20%,#0c1e35 0%,var(--bg) 60%)}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:44px 40px;width:380px;box-shadow:0 32px 80px rgba(0,0,0,.6)}
+.auth-logo{font-family:var(--heading);font-size:28px;color:var(--accent);margin-bottom:6px;letter-spacing:-.5px}
+.auth-sub{color:var(--muted);font-size:13px;margin-bottom:32px}
+.auth-box label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.auth-box input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:var(--font);outline:none;transition:.2s}
+.auth-box input:focus{border-color:var(--accent)}
+.auth-box .field{margin-bottom:18px}
+.btn-primary{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;font-family:var(--font);cursor:pointer;transition:.2s;margin-top:4px}
+.btn-primary:hover{background:var(--accent2);transform:translateY(-1px)}
+.auth-error{color:var(--red);font-size:12px;margin-top:10px;text-align:center;display:none}
+
+/* LAYOUT */
+#app{display:none;min-height:100vh}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:224px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sidebar-logo{font-family:var(--heading);font-size:20px;color:var(--accent);padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.sidebar-logo span{color:var(--muted);font-size:11px;display:block;margin-top:2px;font-family:var(--font);font-weight:400}
+.nav-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:14px 20px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border-left:3px solid transparent;transition:.15s}
+.nav-item:hover{color:var(--text);background:rgba(14,165,233,.06)}
+.nav-item.active{color:var(--accent);background:rgba(14,165,233,.08);border-left-color:var(--accent)}
+.nav-item .icon{font-size:15px;width:20px;text-align:center}
+.sidebar-bottom{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;flex-shrink:0}
+.logout-btn{font-size:11px;color:var(--red);cursor:pointer;margin-top:6px;background:none;border:none;font-family:var(--font)}
+.main{margin-left:224px;padding:28px 32px;min-height:100vh}
+.page{display:none}
+.page.active{display:block;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page-title{font-family:var(--heading);font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;opacity:.07}
+.stat-card.blue::before{background:var(--accent)}.stat-card.green::before{background:var(--green)}
+.stat-card.red::before{background:var(--red)}.stat-card.amber::before{background:var(--amber)}
+.stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px}
+.stat-val{font-family:var(--heading);font-size:26px;font-weight:700;margin-bottom:4px}
+.stat-val.blue{color:var(--accent)}.stat-val.green{color:var(--green)}.stat-val.red{color:var(--red)}.stat-val.amber{color:var(--amber)}
+.stat-hint{font-size:11px;color:var(--muted)}
+
+/* TABLE */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:24px}
+.card-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-head h3{font-size:14px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border)}
+td{padding:12px 16px;border-bottom:1px solid rgba(30,45,69,.6);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(14,165,233,.03)}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge.green{background:rgba(34,197,94,.12);color:var(--green)}.badge.red{background:rgba(239,68,68,.12);color:var(--red)}
+.badge.amber{background:rgba(245,158,11,.12);color:var(--amber)}.badge.blue{background:rgba(14,165,233,.12);color:var(--accent)}
+
+/* FORMS */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-grid.three{grid-template-columns:1fr 1fr 1fr}
+.field label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13.5px;font-family:var(--font);outline:none;transition:.2s}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field select option{background:var(--surface)}
+.btn-sm{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:.15s;white-space:nowrap}
+.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{background:var(--accent2)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{filter:brightness(1.1)}
+.btn-red{background:var(--red);color:#fff}
+.btn-amber{background:var(--amber);color:#000}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent)}
+
+/* PDF ZONE */
+.pdf-zone{border:2px dashed var(--border);border-radius:14px;padding:40px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface)}
+.pdf-zone:hover,.pdf-zone.drag{border-color:var(--accent);background:rgba(14,165,233,.05)}
+.pdf-zone .zone-icon{font-size:40px;margin-bottom:12px}
+.pdf-zone h4{font-size:15px;font-weight:600;margin-bottom:6px}
+.pdf-zone p{color:var(--muted);font-size:13px}
+.pdf-result{background:var(--card);border:1px solid var(--green);border-radius:14px;padding:20px;margin-top:20px;display:none}
+.pdf-result h4{color:var(--green);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
+.detected-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.detected-row:last-child{border-bottom:none}
+.detected-label{color:var(--muted);font-size:13px}
+.detected-val{font-weight:700;font-size:15px;color:var(--accent)}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:var(--accent);transition:width .3s;border-radius:2px}
+
+/* BROWSER */
+.browser-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.browser-bar{background:var(--surface);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.browser-dots{display:flex;gap:6px;flex-shrink:0}
+.dot{width:10px;height:10px;border-radius:50%}
+.dot.red{background:#ef4444}.dot.amber{background:#f59e0b}.dot.green{background:#22c55e}
+.browser-url{flex:1;min-width:200px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:6px 12px;color:var(--text);font-size:12px;font-family:var(--font);outline:none}
+.browser-url:focus{border-color:var(--accent)}
+.browser-go{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--font);font-weight:600;flex-shrink:0}
+.browser-frame{width:100%;height:560px;border:none;background:#fff}
+
+/* QUICK LINKS */
+.quick-links{display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border)}
+.qlink{background:var(--surfaceHigh,#252840);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap}
+.qlink:hover{color:var(--accent);border-color:var(--accent);background:rgba(14,165,233,.08)}
+.qlink.active-link{color:var(--accent);border-color:var(--accent)}
+
+/* MODAL / SNACK */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal h3{font-family:var(--heading);font-size:18px;margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+.snack{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:none;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.snack.show{display:block;animation:slideUp .3s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(14,165,233,.1);color:var(--accent)}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* LEDGER PDF BUTTON */
+.download-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">✈ GuruSales</div>
+    <div class="auth-sub">Flight Ticket Accounting — SmartHubHKG</div>
+    <div class="field"><label>Username</label><input id="login-user" type="text" value="admin" placeholder="admin"/></div>
+    <div class="field"><label>Password</label><input id="login-pass" type="password" value="admin123" placeholder="••••••"/></div>
+    <button class="btn-primary" onclick="doLogin()">Sign In</button>
+    <div class="auth-error" id="auth-err">Invalid credentials</div>
+    <div style="margin-top:16px;font-size:11px;color:var(--muted);text-align:center">Demo: admin / admin123</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">✈ GuruSales<span>SmartHubHKG</span></div>
+    <nav>
+      <div class="nav-section">Accounting</div>
+      <div class="nav-item active" onclick="showPage('dashboard')" data-page="dashboard"><span class="icon">📊</span>Dashboard</div>
+      <div class="nav-item" onclick="showPage('pdf')" data-page="pdf"><span class="icon">📄</span>PDF Reader</div>
+      <div class="nav-item" onclick="showPage('sales')" data-page="sales"><span class="icon">✈</span>Sales Entry</div>
+      <div class="nav-item" onclick="showPage('agents')" data-page="agents"><span class="icon">👥</span>Agents</div>
+      <div class="nav-item" onclick="showPage('ledger')" data-page="ledger"><span class="icon">📒</span>Ledger + PDF</div>
+      <div class="nav-item" onclick="showPage('deposits')" data-page="deposits"><span class="icon">💰</span>Deposits</div>
+      <div class="nav-section">Booking Portals</div>
+      <div class="nav-item" onclick="showPage('browser')" data-page="browser"><span class="icon">🌐</span>All Portals</div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="user-chip">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div>
+          <div style="font-size:13px;font-weight:600" id="user-name">Admin</div>
+          <div style="font-size:11px;color:var(--muted)" id="user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">⏻ Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">Dashboard</div>
+      <div class="page-sub" id="dash-date"></div>
+      <div class="stats-grid">
+        <div class="stat-card blue"><div class="stat-label">Today's Sales</div><div class="stat-val blue" id="stat-today">PKR 0</div><div class="stat-hint" id="stat-today-count">0 tickets</div></div>
+        <div class="stat-card green"><div class="stat-label">Total Deposits</div><div class="stat-val green" id="stat-deposits">PKR 0</div><div class="stat-hint">Cash + Bank</div></div>
+        <div class="stat-card red"><div class="stat-label">Total Due</div><div class="stat-val red" id="stat-due">PKR 0</div><div class="stat-hint">Outstanding</div></div>
+        <div class="stat-card amber"><div class="stat-label">Active Agents</div><div class="stat-val amber" id="stat-agents">0</div><div class="stat-hint">Registered</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Recent Ticket Sales</h3><button class="btn-sm btn-accent" onclick="showPage('sales')">+ Add Sale</button></div>
+        <table><thead><tr><th>Date</th><th>Passenger</th><th>Route</th><th>Agent</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody id="recent-sales-body"><tr><td colspan="6" class="empty">No sales yet</td></tr></tbody></table>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Agent Balance Summary</h3></div>
+        <table><thead><tr><th>Agent</th><th>Total Sales</th><th>Deposited</th><th>Balance Due</th><th>Status</th></tr></thead>
+        <tbody id="agent-summary-body"><tr><td colspan="5" class="empty">No agents yet</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- PDF READER -->
+    <div class="page" id="page-pdf">
+      <div class="page-title">PDF Ticket Reader</div>
+      <div class="page-sub">Upload flight ticket PDF — net payable auto-detected</div>
+      <div class="pdf-zone" id="pdf-zone" onclick="document.getElementById('pdf-file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handlePdfDrop(event)">
+        <div class="zone-icon">📄</div>
+        <h4>Drop ticket PDF here or click to upload</h4>
+        <p>Any airline e-ticket PDF supported</p>
+        <input type="file" id="pdf-file-input" accept=".pdf" onchange="handlePdfFile(this.files[0])"/>
+      </div>
+      <div class="pdf-result" id="pdf-result">
+        <h4>✅ Detected from PDF</h4>
+        <div class="detected-row"><span class="detected-label">Passenger Name</span><span class="detected-val" id="det-name">—</span></div>
+        <div class="detected-row"><span class="detected-label">Flight Number</span><span class="detected-val" id="det-flight">—</span></div>
+        <div class="detected-row"><span class="detected-label">Route</span><span class="detected-val" id="det-route">—</span></div>
+        <div class="detected-row"><span class="detected-label">Travel Date</span><span class="detected-val" id="det-date">—</span></div>
+        <div class="detected-row"><span class="detected-label">Net Payable</span><span class="detected-val" id="det-price" style="color:var(--green);font-size:20px">—</span></div>
+        <div class="progress-bar"><div class="progress-fill" id="pdf-progress" style="width:0%"></div></div>
+        <div style="margin-top:16px;display:flex;gap:10px">
+          <button class="btn-sm btn-green" onclick="usePdfData()">✈ Use for Sales Entry</button>
+          <button class="btn-sm btn-ghost" onclick="resetPdf()">Reset</button>
+        </div>
+      </div>
+      <div class="card" id="pdf-text-card" style="display:none;margin-top:20px">
+        <div class="card-head"><h3>PDF Raw Text</h3></div>
+        <div style="padding:16px;font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:280px;overflow-y:auto;font-family:monospace" id="pdf-raw-text"></div>
+      </div>
+    </div>
+
+    <!-- SALES ENTRY -->
+    <div class="page" id="page-sales">
+      <div class="page-title">Sales Entry</div>
+      <div class="page-sub">Record a ticket sale and assign to an agent</div>
+      <div class="card">
+        <div class="card-head"><h3>New Ticket Sale</h3></div>
+        <div style="padding:20px">
+          <div class="form-grid" style="margin-bottom:16px">
+            <div class="field"><label>Passenger Name</label><input id="s-passenger" type="text" placeholder="John Doe"/></div>
+            <div class="field"><label>PNR / Ticket No</label><input id="s-pnr" type="text" placeholder="ABC123"/></div>
+          </div>
+          <div class="form-grid three" style="margin-bottom:16px">
+            <div class="field"><label>From</label><input id="s-from" type="text" placeholder="KHI"/></div>
+            <div class="field"><label>To</label><input id="s-to" type="text" placeholder="DXB"/></div>
+            <div class="field"><label>Travel Date</label><input id="s-tdate" type="date"/></div>
+          </div>
+          <div class="form-grid three" style="margin-bottom:16px">
+            <div class="field"><label>Net Payable (PKR)</label><input id="s-price" type="number" placeholder="0" oninput="calcSale()"/></div>
+            <div class="field"><label>Service Charge</label><input id="s-charge" type="number" placeholder="0" value="0" oninput="calcSale()"/></div>
+            <div class="field"><label>Total Amount</label><input id="s-total" type="number" placeholder="0" readonly style="background:var(--bg);color:var(--accent);font-weight:700"/></div>
+          </div>
+          <div class="form-grid" style="margin-bottom:20px">
+            <div class="field"><label>Assign to Agent</label><select id="s-agent"><option value="">— Select Agent —</option></select></div>
+            <div class="field"><label>Sale Date</label><input id="s-date" type="date"/></div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn-sm btn-accent" style="padding:10px 24px" onclick="saveSale()">💾 Save Sale</button>
+            <button class="btn-sm btn-ghost" onclick="clearSaleForm()">Clear</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>All Sales</h3>
+          <input style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font-size:12px;width:200px" placeholder="Search passenger / PNR..." oninput="filterSales(this.value)"/>
+        </div>
+        <table><thead><tr><th>Date</th><th>Passenger</th><th>PNR</th><th>Route</th><th>Agent</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="sales-table-body"><tr><td colspan="7" class="empty">No sales recorded</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div class="page" id="page-agents">
+      <div class="page-title">Agent Management</div>
+      <div class="page-sub">Add and manage your agents</div>
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-head"><h3>Add New Agent</h3></div>
+        <div style="padding:20px">
+          <div class="form-grid three" style="margin-bottom:16px">
+            <div class="field"><label>Agent Name</label><input id="a-name" type="text" placeholder="Full Name"/></div>
+            <div class="field"><label>Phone</label><input id="a-phone" type="text" placeholder="+92 300 0000000"/></div>
+            <div class="field"><label>Opening Balance (PKR)</label><input id="a-balance" type="number" placeholder="0" value="0"/></div>
+          </div>
+          <button class="btn-sm btn-accent" onclick="saveAgent()">+ Add Agent</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>All Agents</h3></div>
+        <table><thead><tr><th>Name</th><th>Phone</th><th>Total Sales</th><th>Deposited</th><th>Due Balance</th><th>Action</th></tr></thead>
+        <tbody id="agents-table-body"><tr><td colspan="6" class="empty">No agents added</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- LEDGER -->
+    <div class="page" id="page-ledger">
+      <div class="page-title">Agent Ledger</div>
+      <div class="page-sub">Full debit/credit ledger with PDF download</div>
+      <div style="margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="field" style="margin:0;flex:1;max-width:280px">
+          <select id="ledger-agent-select" onchange="renderLedger()">
+            <option value="">— Select Agent —</option>
+          </select>
+        </div>
+        <div class="download-bar">
+          <button class="btn-sm btn-red" id="btn-dl-pdf" onclick="downloadLedgerPDF()" style="display:none">⬇ Download PDF</button>
+          <button class="btn-sm btn-ghost" id="btn-dl-csv" onclick="downloadLedgerCSV()" style="display:none">⬇ Export CSV</button>
+        </div>
+      </div>
+      <div id="ledger-content"><div class="empty">Select an agent to view ledger</div></div>
+    </div>
+
+    <!-- DEPOSITS -->
+    <div class="page" id="page-deposits">
+      <div class="page-title">Deposits</div>
+      <div class="page-sub">Record cash and bank deposits from agents</div>
+      <div class="card" style="margin-bottom:24px">
+        <div class="card-head"><h3>Record Deposit</h3></div>
+        <div style="padding:20px">
+          <div class="form-grid three" style="margin-bottom:16px">
+            <div class="field"><label>Agent</label><select id="d-agent"><option value="">— Select Agent —</option></select></div>
+            <div class="field"><label>Amount (PKR)</label><input id="d-amount" type="number" placeholder="0"/></div>
+            <div class="field"><label>Method</label>
+              <select id="d-method"><option value="cash">Cash</option><option value="bank">Bank Transfer</option></select>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom:16px">
+            <div class="field"><label>Date</label><input id="d-date" type="date"/></div>
+            <div class="field"><label>Reference / Note</label><input id="d-note" type="text" placeholder="Cheque no, bank ref..."/></div>
+          </div>
+          <button class="btn-sm btn-green" onclick="saveDeposit()">💰 Record Deposit</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Deposit History</h3></div>
+        <table><thead><tr><th>Date</th><th>Agent</th><th>Amount</th><th>Method</th><th>Reference</th></tr></thead>
+        <tbody id="deposits-table-body"><tr><td colspan="5" class="empty">No deposits recorded</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- BROWSER / PORTALS -->
+    <div class="page" id="page-browser">
+      <div class="page-title">Booking Portals</div>
+      <div class="page-sub">Login to your ticketing systems directly here</div>
+      <div class="browser-wrap">
+        <div class="browser-bar">
+          <div class="browser-dots"><div class="dot red"></div><div class="dot amber"></div><div class="dot green"></div></div>
+          <button class="btn-sm btn-ghost" style="padding:5px 10px;font-size:12px" onclick="browserBack()">←</button>
+          <button class="btn-sm btn-ghost" style="padding:5px 10px;font-size:12px" onclick="browserForward()">→</button>
+          <button class="btn-sm btn-ghost" style="padding:5px 10px;font-size:12px" onclick="browserRefresh()">↻</button>
+          <input class="browser-url" id="browser-url" type="text" value="https://www.google.com" onkeydown="if(event.key==='Enter')browserGo()"/>
+          <button class="browser-go" onclick="browserGo()">Go</button>
+        </div>
+
+        <!-- Quick link buttons -->
+        <div class="quick-links">
+          <span style="font-size:11px;color:var(--muted);align-self:center;margin-right:4px">PORTALS:</span>
+
+          <button class="qlink" onclick="navTo('https://book.nac.crane.aero','NAC Crane')">🦅 NAC Crane</button>
+          <button class="qlink" onclick="navTo('https://www.airblue.com/bookings/flight-booking.aspx','Airblue')">🔵 Airblue</button>
+          <button class="qlink" onclick="navTo('https://www.piac.com.pk','PIA')">🟢 PIA</button>
+          <button class="qlink" onclick="navTo('https://www.sereneair.com','Serene Air')">🌙 Serene Air</button>
+          <button class="qlink" onclick="navTo('https://www.flyindus.com','Indus')">✈ Indus Air</button>
+          <button class="qlink" onclick="navTo('https://amadeus.com','Amadeus')">🔶 Amadeus GDS</button>
+          <button class="qlink" onclick="navTo('https://www.travelport.com','Galileo')">🔷 Galileo</button>
+          <button class="qlink" onclick="navTo('https://www.sabre.com','Sabre')">⚡ Sabre</button>
+          <button class="qlink" onclick="navTo('https://www.emirates.com/pk/english/','Emirates')">✈ Emirates</button>
+          <button class="qlink" onclick="navTo('https://www.flydubai.com/en/','FlyDubai')">🇦🇪 FlyDubai</button>
+          <button class="qlink" onclick="navTo('https://www.turkishairlines.com','Turkish')">🇹🇷 Turkish</button>
+          <button class="qlink" onclick="navTo('https://www.qatarairways.com','Qatar')">🇶🇦 Qatar</button>
+        </div>
+
+        <iframe class="browser-frame" id="browser-iframe"
+          src="https://book.nac.crane.aero"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation allow-modals">
+        </iframe>
+      </div>
+
+      <!-- Portal Info Cards -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px">
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">🦅</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">NAC Crane</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">book.nac.crane.aero — National Air Charter</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://book.nac.crane.aero','NAC Crane')">Open Portal</button>
+          </div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">🔵</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">Airblue</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">airblue.com — Pakistan domestic + intl</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://www.airblue.com/bookings/flight-booking.aspx','Airblue')">Open Portal</button>
+          </div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">🟢</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">PIA</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">piac.com.pk — Pakistan International Airlines</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://www.piac.com.pk','PIA')">Open Portal</button>
+          </div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">🔶</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">Amadeus GDS</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Global Distribution System</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://amadeus.com','Amadeus')">Open Portal</button>
+          </div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">🌙</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">Serene Air</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">sereneair.com — Pakistan private airline</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://www.sereneair.com','Serene Air')">Open Portal</button>
+          </div>
+        </div>
+        <div class="card" style="margin:0">
+          <div style="padding:16px">
+            <div style="font-size:20px;margin-bottom:8px">✈</div>
+            <div style="font-weight:700;font-size:14px;margin-bottom:4px">Emirates</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">emirates.com — International flights</div>
+            <button class="btn-sm btn-accent" style="width:100%" onclick="navTo('https://www.emirates.com/pk/english/','Emirates')">Open Portal</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn-sm btn-ghost" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="snack" id="snack"></div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let state = { currentUser:null, agents:[], sales:[], deposits:[] };
+const USERS = [
+  {id:'admin',name:'Admin',role:'Administrator',pass:'admin123'},
+  {id:'agent1',name:'Ali Raza',role:'Agent',pass:'pass123'},
+];
+function loadState(){ const s=localStorage.getItem('gurusales_v3'); if(s) Object.assign(state,JSON.parse(s)); }
+function saveState(){ localStorage.setItem('gurusales_v3',JSON.stringify({agents:state.agents,sales:state.sales,deposits:state.deposits})); }
+loadState();
+
+// ══════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════
+function doLogin(){
+  const u=document.getElementById('login-user').value.trim();
+  const p=document.getElementById('login-pass').value.trim();
+  const user=USERS.find(x=>x.id===u&&x.pass===p);
+  if(!user){document.getElementById('auth-err').style.display='block';return;}
+  state.currentUser=user;
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('user-name').textContent=user.name;
+  document.getElementById('user-role').textContent=user.role;
+  document.getElementById('user-avatar').textContent=user.name[0];
+  document.getElementById('dash-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  setTodayDates(); refreshAll();
+}
+function doLogout(){ state.currentUser=null; document.getElementById('app').style.display='none'; document.getElementById('auth-screen').style.display='flex'; }
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelector(`[data-page="${id}"]`).classList.add('active');
+  if(id==='agents') renderAgentsTable();
+  if(id==='ledger') populateLedgerSelect();
+  if(id==='deposits') populateDepositSelect();
+  if(id==='sales') populateSalesAgentSelect();
+  if(id==='dashboard') renderDashboard();
+}
+function setTodayDates(){
+  const t=new Date().toISOString().split('T')[0];
+  ['s-date','s-tdate','d-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=t;});
+}
+
+// ══════════════════════════════════════════
+// AGENTS
+// ══════════════════════════════════════════
+function saveAgent(){
+  const name=document.getElementById('a-name').value.trim();
+  const phone=document.getElementById('a-phone').value.trim();
+  const balance=parseFloat(document.getElementById('a-balance').value)||0;
+  if(!name){snack('Enter agent name','red');return;}
+  state.agents.push({id:Date.now().toString(),name,phone,openingBalance:balance});
+  saveState(); renderAgentsTable();
+  document.getElementById('a-name').value='';
+  document.getElementById('a-phone').value='';
+  document.getElementById('a-balance').value='0';
+  snack('Agent added: '+name,'green');
+}
+function agentStats(agentId){
+  const sales=state.sales.filter(s=>s.agentId===agentId);
+  const totalSales=sales.reduce((a,s)=>a+s.total,0);
+  const deposits=state.deposits.filter(d=>d.agentId===agentId);
+  const totalDeposits=deposits.reduce((a,d)=>a+d.amount,0);
+  const agent=state.agents.find(a=>a.id===agentId);
+  const opening=agent?.openingBalance||0;
+  const due=(totalSales+opening)-totalDeposits;
+  return{totalSales,totalDeposits,due,count:sales.length};
+}
+function renderAgentsTable(){
+  const tbody=document.getElementById('agents-table-body');
+  if(!state.agents.length){tbody.innerHTML='<tr><td colspan="6" class="empty">No agents added</td></tr>';return;}
+  tbody.innerHTML=state.agents.map(a=>{
+    const s=agentStats(a.id);
+    const cls=s.due<=0?'green':s.due<5000?'amber':'red';
+    return`<tr><td><strong>${a.name}</strong></td><td>${a.phone||'—'}</td>
+    <td>PKR ${fmt(s.totalSales)}</td><td>PKR ${fmt(s.totalDeposits)}</td>
+    <td><span class="badge ${cls}">PKR ${fmt(s.due)}</span></td>
+    <td><button class="btn-sm btn-ghost" onclick="viewLedgerAgent('${a.id}')">Ledger</button></td></tr>`;
+  }).join('');
+}
+function viewLedgerAgent(id){showPage('ledger');setTimeout(()=>{document.getElementById('ledger-agent-select').value=id;renderLedger();},50);}
+
+// ══════════════════════════════════════════
+// SALES
+// ══════════════════════════════════════════
+function calcSale(){
+  const p=parseFloat(document.getElementById('s-price').value)||0;
+  const c=parseFloat(document.getElementById('s-charge').value)||0;
+  document.getElementById('s-total').value=p+c;
+}
+function saveSale(){
+  const passenger=document.getElementById('s-passenger').value.trim();
+  const pnr=document.getElementById('s-pnr').value.trim();
+  const from=document.getElementById('s-from').value.trim();
+  const to=document.getElementById('s-to').value.trim();
+  const tdate=document.getElementById('s-tdate').value;
+  const price=parseFloat(document.getElementById('s-price').value)||0;
+  const charge=parseFloat(document.getElementById('s-charge').value)||0;
+  const total=price+charge;
+  const agentId=document.getElementById('s-agent').value;
+  const date=document.getElementById('s-date').value;
+  if(!passenger||!agentId||!price){snack('Fill passenger, price & agent','red');return;}
+  state.sales.push({id:Date.now().toString(),passenger,pnr,from,to,tdate,price,charge,total,agentId,date});
+  saveState(); clearSaleForm(); renderSalesTable(); renderDashboard();
+  snack('Sale saved for '+passenger,'green');
+}
+function clearSaleForm(){
+  ['s-passenger','s-pnr','s-from','s-to','s-price','s-charge'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('s-total').value='';
+  document.getElementById('s-charge').value='0';
+  setTodayDates();
+}
+let _sf='';
+function filterSales(v){_sf=v.toLowerCase();renderSalesTable();}
+function renderSalesTable(){
+  const tbody=document.getElementById('sales-table-body');
+  let sales=[...state.sales].reverse();
+  if(_sf) sales=sales.filter(s=>s.passenger.toLowerCase().includes(_sf)||s.pnr.toLowerCase().includes(_sf));
+  if(!sales.length){tbody.innerHTML='<tr><td colspan="7" class="empty">No sales</td></tr>';return;}
+  tbody.innerHTML=sales.map(s=>{
+    const agent=state.agents.find(a=>a.id===s.agentId);
+    return`<tr><td>${s.date}</td><td><strong>${s.passenger}</strong></td>
+    <td><span class="tag">${s.pnr||'—'}</span></td>
+    <td>${s.from||'?'}→${s.to||'?'}</td>
+    <td>${agent?.name||'?'}</td>
+    <td style="color:var(--accent);font-weight:700">PKR ${fmt(s.total)}</td>
+    <td><button class="btn-sm btn-red" style="padding:4px 10px;font-size:11px" onclick="deleteSale('${s.id}')">✕</button></td></tr>`;
+  }).join('');
+}
+function deleteSale(id){state.sales=state.sales.filter(s=>s.id!==id);saveState();renderSalesTable();renderDashboard();snack('Sale deleted','amber');}
+
+// ══════════════════════════════════════════
+// DEPOSITS
+// ══════════════════════════════════════════
+function saveDeposit(){
+  const agentId=document.getElementById('d-agent').value;
+  const amount=parseFloat(document.getElementById('d-amount').value)||0;
+  const method=document.getElementById('d-method').value;
+  const date=document.getElementById('d-date').value;
+  const note=document.getElementById('d-note').value.trim();
+  if(!agentId||!amount){snack('Select agent and amount','red');return;}
+  state.deposits.push({id:Date.now().toString(),agentId,amount,method,date,note});
+  saveState();
+  document.getElementById('d-amount').value='';
+  document.getElementById('d-note').value='';
+  renderDepositsTable(); renderDashboard();
+  const agent=state.agents.find(a=>a.id===agentId);
+  snack('Deposit recorded for '+agent?.name,'green');
+}
+function renderDepositsTable(){
+  const tbody=document.getElementById('deposits-table-body');
+  if(!state.deposits.length){tbody.innerHTML='<tr><td colspan="5" class="empty">No deposits</td></tr>';return;}
+  tbody.innerHTML=[...state.deposits].reverse().map(d=>{
+    const agent=state.agents.find(a=>a.id===d.agentId);
+    return`<tr><td>${d.date}</td><td>${agent?.name||'?'}</td>
+    <td style="color:var(--green);font-weight:700">PKR ${fmt(d.amount)}</td>
+    <td><span class="badge ${d.method==='cash'?'amber':'blue'}">${d.method.toUpperCase()}</span></td>
+    <td>${d.note||'—'}</td></tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// LEDGER
+// ══════════════════════════════════════════
+function populateLedgerSelect(){
+  const sel=document.getElementById('ledger-agent-select');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Select Agent —</option>'+
+    state.agents.map(a=>`<option value="${a.id}"${a.id===cur?' selected':''}>${a.name}</option>`).join('');
+}
+
+function getLedgerEntries(agentId){
+  const agent=state.agents.find(a=>a.id===agentId);
+  let entries=[];
+  if(agent.openingBalance>0) entries.push({date:'Opening',desc:'Opening Balance',dr:agent.openingBalance,cr:0});
+  state.sales.filter(s=>s.agentId===agentId).forEach(s=>
+    entries.push({date:s.date,desc:`Ticket: ${s.passenger} (${s.from||'?'}→${s.to||'?'})${s.pnr?' PNR:'+s.pnr:''}`,dr:s.total,cr:0}));
+  state.deposits.filter(d=>d.agentId===agentId).forEach(d=>
+    entries.push({date:d.date,desc:`Deposit [${d.method.toUpperCase()}]${d.note?' – '+d.note:''}`,dr:0,cr:d.amount}));
+  entries.sort((a,b)=>a.date.localeCompare(b.date));
+  return entries;
+}
+
+function renderLedger(){
+  const agentId=document.getElementById('ledger-agent-select').value;
+  const container=document.getElementById('ledger-content');
+  const dlPdf=document.getElementById('btn-dl-pdf');
+  const dlCsv=document.getElementById('btn-dl-csv');
+  if(!agentId){container.innerHTML='<div class="empty">Select an agent to view ledger</div>';dlPdf.style.display='none';dlCsv.style.display='none';return;}
+  dlPdf.style.display='inline-block';dlCsv.style.display='inline-block';
+  const agent=state.agents.find(a=>a.id===agentId);
+  const stats=agentStats(agentId);
+  const entries=getLedgerEntries(agentId);
+  let running=0;
+  const rows=entries.map(e=>{
+    running+=e.dr-e.cr;
+    return`<tr><td>${e.date}</td><td>${e.desc}</td>
+    <td style="color:var(--red)">${e.dr?'PKR '+fmt(e.dr):'—'}</td>
+    <td style="color:var(--green)">${e.cr?'PKR '+fmt(e.cr):'—'}</td>
+    <td style="font-weight:700;color:${running>=0?'var(--red)':'var(--green)'}">${running>=0?'DR':'CR'} PKR ${fmt(Math.abs(running))}</td></tr>`;
+  }).join('');
+  container.innerHTML=`
+    <div style="display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap">
+      <div class="stat-card blue" style="flex:1;min-width:160px"><div class="stat-label">Total Debit</div><div class="stat-val blue">PKR ${fmt(stats.totalSales)}</div></div>
+      <div class="stat-card green" style="flex:1;min-width:160px"><div class="stat-label">Total Credit</div><div class="stat-val green">PKR ${fmt(stats.totalDeposits)}</div></div>
+      <div class="stat-card ${stats.due>0?'red':'green'}" style="flex:1;min-width:160px"><div class="stat-label">Balance Due</div><div class="stat-val ${stats.due>0?'red':'green'}">PKR ${fmt(Math.abs(stats.due))}</div><div class="stat-hint">${stats.due>0?'Agent Owes You':'You Owe Agent'}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>📒 Ledger — ${agent.name}</h3></div>
+      <table><thead><tr><th>Date</th><th>Description</th><th>Debit (DR)</th><th>Credit (CR)</th><th>Balance</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" class="empty">No transactions</td></tr>'}</tbody></table>
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+// LEDGER PDF DOWNLOAD
+// ══════════════════════════════════════════
+function downloadLedgerPDF(){
+  const agentId=document.getElementById('ledger-agent-select').value;
+  if(!agentId){snack('Select an agent first','red');return;}
+  const agent=state.agents.find(a=>a.id===agentId);
+  const stats=agentStats(agentId);
+  const entries=getLedgerEntries(agentId);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+
+  // Header background
+  doc.setFillColor(8,12,20);
+  doc.rect(0,0,210,297,'F');
+
+  // Title bar
+  doc.setFillColor(14,165,233);
+  doc.rect(0,0,210,22,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica','bold');
+  doc.text('GuruSales — Agent Ledger Statement',14,14);
+
+  // Meta
+  doc.setFillColor(19,27,42);
+  doc.rect(0,22,210,28,'F');
+  doc.setFontSize(10);
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(160,174,192);
+  doc.text('Agent:',14,32); doc.setTextColor(226,234,245); doc.text(agent.name,40,32);
+  doc.setTextColor(160,174,192);
+  doc.text('Phone:',14,39); doc.setTextColor(226,234,245); doc.text(agent.phone||'N/A',40,39);
+  doc.setTextColor(160,174,192);
+  doc.text('Generated:',110,32); doc.setTextColor(226,234,245); doc.text(new Date().toLocaleString(),135,32);
+  doc.setTextColor(160,174,192);
+  doc.text('SmartHubHKG',110,39); doc.setTextColor(14,165,233); doc.text('smarthubhkg.com',135,39);
+
+  // Summary boxes
+  const boxes=[
+    {label:'Total Debit (Sales)',val:'PKR '+fmt(stats.totalSales),color:[239,68,68]},
+    {label:'Total Credit (Deposits)',val:'PKR '+fmt(stats.totalDeposits),color:[34,197,94]},
+    {label:'Balance Due',val:'PKR '+fmt(Math.abs(stats.due)),color:stats.due>0?[239,68,68]:[34,197,94]},
+  ];
+  boxes.forEach((b,i)=>{
+    const x=14+(i*65);
+    doc.setFillColor(30,45,69);
+    doc.roundedRect(x,54,60,20,3,3,'F');
+    doc.setTextColor(160,174,192); doc.setFontSize(7);
+    doc.text(b.label,x+4,61);
+    doc.setTextColor(...b.color); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(b.val,x+4,70);
+  });
+
+  // Table
+  let running=0;
+  const tableData=entries.map(e=>{
+    running+=e.dr-e.cr;
+    return[
+      e.date,
+      e.desc.length>45?e.desc.substring(0,45)+'...':e.desc,
+      e.dr?'PKR '+fmt(e.dr):'—',
+      e.cr?'PKR '+fmt(e.cr):'—',
+      (running>=0?'DR ':'CR ')+'PKR '+fmt(Math.abs(running))
+    ];
+  });
+
+  doc.autoTable({
+    startY:80,
+    head:[['Date','Description','Debit (DR)','Credit (CR)','Balance']],
+    body:tableData,
+    theme:'grid',
+    styles:{fontSize:8,cellPadding:3,textColor:[226,234,245],fillColor:[19,27,42],lineColor:[30,45,69],lineWidth:0.3},
+    headStyles:{fillColor:[14,165,233],textColor:[255,255,255],fontStyle:'bold',fontSize:8},
+    alternateRowStyles:{fillColor:[25,35,55]},
+    columnStyles:{
+      0:{cellWidth:22},1:{cellWidth:80},
+      2:{cellWidth:28,halign:'right'},3:{cellWidth:28,halign:'right'},4:{cellWidth:30,halign:'right'}
+    },
+    margin:{left:14,right:14},
+  });
+
+  // Footer
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFillColor(14,20,32);
+    doc.rect(0,287,210,10,'F');
+    doc.setFontSize(8);
+    doc.setTextColor(113,128,150);
+    doc.text(`GuruSales by SmartHubHKG | Page ${i} of ${pageCount}`,14,293);
+    doc.text(new Date().toLocaleDateString(),170,293);
+  }
+
+  doc.save(`Ledger_${agent.name.replace(/\s+/g,'_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+  snack('PDF downloaded!','green');
+}
+
+// ══════════════════════════════════════════
+// LEDGER CSV EXPORT
+// ══════════════════════════════════════════
+function downloadLedgerCSV(){
+  const agentId=document.getElementById('ledger-agent-select').value;
+  if(!agentId){snack('Select an agent first','red');return;}
+  const agent=state.agents.find(a=>a.id===agentId);
+  const entries=getLedgerEntries(agentId);
+  let running=0;
+  const rows=[['Date','Description','Debit (DR)','Credit (CR)','Balance']];
+  entries.forEach(e=>{
+    running+=e.dr-e.cr;
+    rows.push([e.date,'"'+e.desc+'"',e.dr||0,e.cr||0,(running>=0?'DR ':'CR ')+fmt(Math.abs(running))]);
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Ledger_${agent.name.replace(/\s+/g,'_')}.csv`;
+  a.click();
+  snack('CSV exported!','green');
+}
+
+// ══════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════
+function renderDashboard(){
+  const today=new Date().toISOString().split('T')[0];
+  const ts=state.sales.filter(s=>s.date===today);
+  document.getElementById('stat-today').textContent='PKR '+fmt(ts.reduce((a,s)=>a+s.total,0));
+  document.getElementById('stat-today-count').textContent=ts.length+' ticket'+(ts.length!==1?'s':'');
+  document.getElementById('stat-deposits').textContent='PKR '+fmt(state.deposits.reduce((a,d)=>a+d.amount,0));
+  const totalDue=state.agents.reduce((a,ag)=>a+agentStats(ag.id).due,0);
+  document.getElementById('stat-due').textContent='PKR '+fmt(Math.max(0,totalDue));
+  document.getElementById('stat-agents').textContent=state.agents.length;
+
+  const rBody=document.getElementById('recent-sales-body');
+  const recent=[...state.sales].reverse().slice(0,10);
+  rBody.innerHTML=recent.length?recent.map(s=>{
+    const agent=state.agents.find(a=>a.id===s.agentId);
+    return`<tr><td>${s.date}</td><td>${s.passenger}</td><td>${s.from||'?'}→${s.to||'?'}</td>
+    <td>${agent?.name||'?'}</td><td style="color:var(--accent);font-weight:700">PKR ${fmt(s.total)}</td>
+    <td><span class="badge blue">Sold</span></td></tr>`;
+  }).join(''):'<tr><td colspan="6" class="empty">No sales yet</td></tr>';
+
+  const aBody=document.getElementById('agent-summary-body');
+  aBody.innerHTML=state.agents.length?state.agents.map(a=>{
+    const s=agentStats(a.id);
+    const cls=s.due<=0?'green':s.due<5000?'amber':'red';
+    return`<tr><td><strong>${a.name}</strong></td><td>PKR ${fmt(s.totalSales)}</td>
+    <td>PKR ${fmt(s.totalDeposits)}</td><td><span class="badge ${cls}">PKR ${fmt(s.due)}</span></td>
+    <td><span class="badge ${s.due<=0?'green':'red'}">${s.due<=0?'Settled':'Outstanding'}</span></td></tr>`;
+  }).join(''):'<tr><td colspan="5" class="empty">No agents yet</td></tr>';
+}
+
+// ══════════════════════════════════════════
+// POPULATE SELECTS
+// ══════════════════════════════════════════
+function populateSalesAgentSelect(){
+  document.getElementById('s-agent').innerHTML='<option value="">— Select Agent —</option>'+
+    state.agents.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+}
+function populateDepositSelect(){
+  document.getElementById('d-agent').innerHTML='<option value="">— Select Agent —</option>'+
+    state.agents.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+}
+
+// ══════════════════════════════════════════
+// PDF READER
+// ══════════════════════════════════════════
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfData={};
+
+function handlePdfDrop(e){
+  e.preventDefault();
+  document.getElementById('pdf-zone').classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type==='application/pdf') handlePdfFile(f);
+  else snack('Please drop a PDF file','red');
+}
+async function handlePdfFile(file){
+  if(!file) return;
+  const prog=document.getElementById('pdf-progress');
+  prog.style.width='10%';
+  const reader=new FileReader();
+  reader.onload=async function(e){
+    prog.style.width='30%';
+    try{
+      const arr=new Uint8Array(e.target.result);
+      const pdf=await pdfjsLib.getDocument(arr).promise;
+      prog.style.width='60%';
+      let text='';
+      for(let i=1;i<=pdf.numPages;i++){
+        const page=await pdf.getPage(i);
+        const c=await page.getTextContent();
+        text+=c.items.map(x=>x.str).join(' ')+'\n';
+      }
+      prog.style.width='90%';
+      parsePdfText(text);
+      document.getElementById('pdf-raw-text').textContent=text.substring(0,3000)+'...';
+      document.getElementById('pdf-text-card').style.display='block';
+      prog.style.width='100%';
+    }catch(err){snack('PDF error: '+err.message,'red');}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parsePdfText(text){
+  pdfData={};
+  const patterns=[
+    /(?:net\s*payable|total\s*amount|amount\s*due|grand\s*total|total\s*fare|total\s*price|fare\s*total|amount\s*payable)[:\s]*(?:pkr|rs\.?|usd|\$|inr|aed)?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+    /(?:pkr|rs\.?)\s*([\d,]{4,}(?:\.\d{1,2})?)/gi,
+    /(\d{4,}(?:\.\d{2})?)\s*(?:pkr|rs)/gi,
+  ];
+  for(const p of patterns){const m=p.exec(text);if(m){pdfData.price=parseFloat(m[1].replace(/,/g,''));break;}}
+  const nameP=[/(?:passenger|name|traveler|pax)[:\s]+([A-Z][A-Z\s\/]{3,40})/i,/(?:MR|MRS|MS|MISS|DR)[\.\s]+([A-Z][A-Z\s]{2,30})/i];
+  for(const p of nameP){const m=p.exec(text);if(m){pdfData.passenger=m[1].trim().replace(/\s+/g,' ');break;}}
+  const fm=text.match(/([A-Z]{2}\s?\d{3,4})/); if(fm) pdfData.flight=fm[1];
+  const rm=text.match(/([A-Z]{3})\s*(?:to|-|→|\/)\s*([A-Z]{3})/); if(rm) pdfData.route=rm[1]+' → '+rm[2];
+  const dm=text.match(/(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}|\d{2}[\/\-]\d{2}[\/\-]\d{4})/i); if(dm) pdfData.date=dm[1];
+  document.getElementById('det-name').textContent=pdfData.passenger||'Not detected';
+  document.getElementById('det-flight').textContent=pdfData.flight||'Not detected';
+  document.getElementById('det-route').textContent=pdfData.route||'Not detected';
+  document.getElementById('det-date').textContent=pdfData.date||'Not detected';
+  document.getElementById('det-price').textContent=pdfData.price?'PKR '+fmt(pdfData.price):'Not detected';
+  document.getElementById('pdf-result').style.display='block';
+  snack('PDF read successfully!','green');
+}
+function usePdfData(){
+  showPage('sales');
+  setTimeout(()=>{
+    if(pdfData.passenger) document.getElementById('s-passenger').value=pdfData.passenger;
+    if(pdfData.price) document.getElementById('s-price').value=pdfData.price;
+    if(pdfData.route){const p=pdfData.route.split(' → ');if(p[0])document.getElementById('s-from').value=p[0];if(p[1])document.getElementById('s-to').value=p[1];}
+    calcSale(); snack('PDF data loaded into sales form','green');
+  },100);
+}
+function resetPdf(){
+  pdfData={};
+  document.getElementById('pdf-result').style.display='none';
+  document.getElementById('pdf-text-card').style.display='none';
+  document.getElementById('pdf-file-input').value='';
+}
+
+// ══════════════════════════════════════════
+// BROWSER / PORTALS
+// ══════════════════════════════════════════
+function navTo(url, label){
+  document.getElementById('browser-url').value=url;
+  document.getElementById('browser-iframe').src=url;
+  document.querySelectorAll('.qlink').forEach(b=>b.classList.remove('active-link'));
+  event.target.classList.add('active-link');
+}
+function browserGo(){
+  let url=document.getElementById('browser-url').value.trim();
+  if(!url.startsWith('http')) url='https://'+url;
+  document.getElementById('browser-iframe').src=url;
+}
+function browserBack(){document.getElementById('browser-iframe').contentWindow?.history.back();}
+function browserForward(){document.getElementById('browser-iframe').contentWindow?.history.forward();}
+function browserRefresh(){const f=document.getElementById('browser-iframe');f.src=f.src;}
+
+// ══════════════════════════════════════════
+// MODAL / UTILS
+// ══════════════════════════════════════════
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+function fmt(n){return Number(n||0).toLocaleString('en-PK',{minimumFractionDigits:0,maximumFractionDigits:0});}
+function snack(msg,type='blue'){
+  const el=document.getElementById('snack');
+  el.textContent=msg;
+  el.style.borderColor=type==='green'?'var(--green)':type==='red'?'var(--red)':type==='amber'?'var(--amber)':'var(--accent)';
+  el.classList.add('show');
+  clearTimeout(snack._t);
+  snack._t=setTimeout(()=>el.classList.remove('show'),3000);
+}
+function refreshAll(){renderDashboard();renderSalesTable();renderAgentsTable();renderDepositsTable();}
+window.onload=()=>loadState();
+</script>
+</body>
+</html>
